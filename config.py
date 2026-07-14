@@ -14,7 +14,6 @@ DB_PATH = os.getenv("DB_PATH", "shop.db")
 CATEGORIES = {
     "erkak": "👨 Erkak",
     "ayol": "👩 Ayol",
-    "unisex": "⚪ Unisex",
 }
 
 if not BOT_TOKEN:
