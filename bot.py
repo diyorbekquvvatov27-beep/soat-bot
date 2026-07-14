@@ -1,4 +1,5 @@
 import logging
+import re
 
 from telegram import (
     Update,
@@ -9,6 +10,7 @@ from telegram import (
     ReplyKeyboardRemove,
     KeyboardButton,
 )
+from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -19,8 +21,11 @@ from telegram.ext import (
     filters,
 )
 
-from config import BOT_TOKEN, ADMIN_IDS, CATEGORIES
+from config import BOT_TOKEN, ADMIN_IDS, CATEGORIES, CHANNEL_USERNAME, CHANNEL_URL
 import db
+
+# Telefon raqami formati: +998 bilan boshlanib, keyin 9 ta raqam (masalan +998901234567)
+PHONE_PATTERN = re.compile(r"^\+998\d{9}$")
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -42,44 +47,96 @@ def is_admin(user_id: int) -> bool:
 #                     MIJOZ QISMI — KATALOG
 # ============================================================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = (
-        "👋 Assalomu alaykum!\n\n"
-        "Bizning soatlar do'konimizga xush kelibsiz.\n"
-        "Quyidagi kategoriyalardan birini tanlang:"
-    )
-    keyboard = [
+def _categories_keyboard():
+    return [
         [InlineKeyboardButton(label, callback_data=f"cat:{key}")]
         for key, label in CATEGORIES.items()
     ]
-    keyboard.append([InlineKeyboardButton("📞 Aloqa", callback_data="contact")])
-    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def is_subscribed(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
+    try:
+        member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
+        return member.status in ("member", "administrator", "creator")
+    except TelegramError as e:
+        logger.warning(f"Obunani tekshirib bo'lmadi: {e}")
+        # Tekshirib bo'lmasa (masalan bot kanalda admin emas), bloklab qo'ymaymiz
+        return True
+
+
+def _subscribe_keyboard():
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("📢 Kanalga obuna bo'lish", url=CHANNEL_URL)],
+            [InlineKeyboardButton("✅ Obuna bo'ldim", callback_data="check_sub")],
+        ]
+    )
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if await is_subscribed(context, user_id):
+        await update.message.reply_text(
+            "👋 Assalomu alaykum! Bizning soatlar do'konimizga xush kelibsiz.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🛍 Katalog ko'rish", callback_data="back:categories")]]
+            ),
+        )
+    else:
+        await update.message.reply_text(
+            "👋 Assalomu alaykum!\n\n"
+            "Katalogni ko'rish uchun avval kanalimizga obuna bo'ling, "
+            "so'ng \"✅ Obuna bo'ldim\" tugmasini bosing:",
+            reply_markup=_subscribe_keyboard(),
+        )
+
+
+async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = update.effective_user.id
+    if await is_subscribed(context, user_id):
+        await query.answer("✅ Obuna tasdiqlandi!")
+        await query.edit_message_text(
+            "🛍 Katalog ko'rish uchun tugmani bosing:",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🛍 Katalog ko'rish", callback_data="back:categories")]]
+            ),
+        )
+    else:
+        await query.answer("❌ Hali obuna bo'lmagansiz. Avval kanalga obuna bo'ling.", show_alert=True)
 
 
 async def show_categories(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    keyboard = [
-        [InlineKeyboardButton(label, callback_data=f"cat:{key}")]
-        for key, label in CATEGORIES.items()
-    ]
-    keyboard.append([InlineKeyboardButton("📞 Aloqa", callback_data="contact")])
-    await query.edit_message_text(
-        "Kategoriyani tanlang:", reply_markup=InlineKeyboardMarkup(keyboard)
+    await _send_text_screen(
+        update, context, "Kategoriyani tanlang:", InlineKeyboardMarkup(_categories_keyboard())
     )
 
 
-async def choose_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def _send_text_screen(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, keyboard: InlineKeyboardMarkup):
+    """Joriy xabarni matnli ekranga almashtiradi. Agar joriy xabar rasm (media) bo'lsa,
+    tahrirlab bo'lmaydi — o'chirib, yangi matnli xabar yuboriladi."""
     query = update.callback_query
-    await query.answer()
-    category = query.data.split(":", 1)[1]
+    try:
+        await query.edit_message_text(text, reply_markup=keyboard)
+    except TelegramError:
+        try:
+            await query.delete_message()
+        except Exception:
+            pass
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=text, reply_markup=keyboard)
+
+
+async def _render_brands(update: Update, context: ContextTypes.DEFAULT_TYPE, category: str):
     brands = db.get_brands(category)
 
     if not brands:
-        await query.edit_message_text(
+        await _send_text_screen(
+            update, context,
             "Hozircha bu kategoriyada mahsulot yo'q. Boshqasini tanlang.",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("⬅️ Orqaga", callback_data="back:categories")]]
+            InlineKeyboardMarkup(
+                [[InlineKeyboardButton("⬅️ Ortga", callback_data="back:categories")]]
             ),
         )
         return
@@ -89,12 +146,30 @@ async def choose_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton(b, callback_data=f"brand:{b}")] for b in brands
     ]
     keyboard.append([InlineKeyboardButton("🔍 Barchasini ko'rish", callback_data="brand:__all__")])
-    keyboard.append([InlineKeyboardButton("⬅️ Orqaga", callback_data="back:categories")])
+    keyboard.append([InlineKeyboardButton("⬅️ Ortga", callback_data="back:categories")])
 
-    await query.edit_message_text(
+    await _send_text_screen(
+        update, context,
         f"{CATEGORIES[category]} — brendni tanlang:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        InlineKeyboardMarkup(keyboard),
     )
+
+
+async def choose_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    category = query.data.split(":", 1)[1]
+    await _render_brands(update, context, category)
+
+
+async def back_to_brands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    category = context.user_data.get("category")
+    if not category:
+        await show_categories(update, context)
+        return
+    await _render_brands(update, context, category)
 
 
 async def choose_brand(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -144,7 +219,7 @@ async def send_product_card(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     if nav_row:
         keyboard.append(nav_row)
     keyboard.append([InlineKeyboardButton("🛒 Buyurtma berish", callback_data=f"order:{product['id']}")])
-    keyboard.append([InlineKeyboardButton("⬅️ Kategoriyalarga qaytish", callback_data="back:categories")])
+    keyboard.append([InlineKeyboardButton("⬅️ Ortga", callback_data="back:brands")])
 
     markup = InlineKeyboardMarkup(keyboard)
     media = InputMediaPhoto(media=product["photo_file_id"], caption=caption, parse_mode="HTML")
@@ -183,18 +258,6 @@ async def navigate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_product_card(update, context, edit=True)
 
 
-async def contact_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text(
-        "📞 Biz bilan bog'lanish uchun shu botga yozing, tez orada javob beramiz!\n\n"
-        "Yoki /start bosib katalogni ko'ring.",
-        reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("⬅️ Orqaga", callback_data="back:categories")]]
-        ),
-    )
-
-
 # ---------- Buyurtma berish (ConversationHandler) ----------
 
 async def order_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -215,7 +278,9 @@ async def order_get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["order_name"] = update.message.text.strip()
     phone_btn = KeyboardButton("📱 Raqamni yuborish", request_contact=True)
     await update.message.reply_text(
-        "Telefon raqamingizni yuboring (tugmani bosing yoki qo'lda yozing):",
+        "Telefon raqamingizni yuboring:\n"
+        "— pastdagi tugmani bosing, YOKI\n"
+        "— +998 bilan boshlab to'liq yozing (masalan: +998901234567)",
         reply_markup=ReplyKeyboardMarkup([[phone_btn]], one_time_keyboard=True, resize_keyboard=True),
     )
     return O_PHONE
@@ -224,8 +289,19 @@ async def order_get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def order_get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.contact:
         phone = update.message.contact.phone_number
+        if not phone.startswith("+"):
+            phone = "+" + phone
     else:
-        phone = update.message.text.strip()
+        phone = update.message.text.strip().replace(" ", "")
+        if not PHONE_PATTERN.match(phone):
+            phone_btn = KeyboardButton("📱 Raqamni yuborish", request_contact=True)
+            await update.message.reply_text(
+                "❌ Noto'g'ri format. Raqam +998 bilan boshlanib, jami 12 ta belgidan "
+                "iborat bo'lishi kerak (masalan: +998901234567).\n\n"
+                "Qaytadan yuboring yoki tugmani bosing:",
+                reply_markup=ReplyKeyboardMarkup([[phone_btn]], one_time_keyboard=True, resize_keyboard=True),
+            )
+            return O_PHONE
 
     product_id = context.user_data.get("order_product_id")
     product = db.get_product(product_id)
@@ -444,11 +520,12 @@ def main():
 
     # --- Mijoz: katalog navigatsiyasi ---
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(check_subscription, pattern="^check_sub$"))
     app.add_handler(CallbackQueryHandler(show_categories, pattern="^back:categories$"))
+    app.add_handler(CallbackQueryHandler(back_to_brands, pattern="^back:brands$"))
     app.add_handler(CallbackQueryHandler(choose_category, pattern="^cat:"))
     app.add_handler(CallbackQueryHandler(choose_brand, pattern="^brand:"))
     app.add_handler(CallbackQueryHandler(navigate, pattern="^nav:"))
-    app.add_handler(CallbackQueryHandler(contact_info, pattern="^contact$"))
 
     # --- Mijoz: buyurtma berish ---
     order_conv = ConversationHandler(
