@@ -65,6 +65,23 @@ def get_brands(category):
         return [r["brand"] for r in rows]
 
 
+def get_all_brands():
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT brand FROM products WHERE in_stock = 1 ORDER BY brand"
+        ).fetchall()
+        return [r["brand"] for r in rows]
+
+
+def get_products_by_brand(brand):
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM products WHERE brand = ? AND in_stock = 1 ORDER BY id",
+            (brand,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def get_products(category, brand=None):
     with get_conn() as conn:
         if brand:
