@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<title>Soat | Space — Aksiya Banner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Jost:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@1,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0c1a24; --ink-deep:#081119; --ink-mid:#122536;
+    --brass:#c9a227; --brass-light:#f0d878; --brass-dim:#7a5f1c;
+    --bone:#f6efdc; --bone-dim:#a89b7c;
+    --red:#b5312a; --red-light:#e2483b;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{ width:1080px; height:1080px; overflow:hidden; font-family:'Jost',sans-serif; }
+  .banner{
+    position:relative; width:1080px; height:1080px;
+    background:
+      radial-gradient(ellipse 90% 55% at 50% 8%, rgba(201,162,39,0.16), transparent 60%),
+      radial-gradient(ellipse 75% 50% at 10% 90%, rgba(20,95,90,0.22), transparent 60%),
+      radial-gradient(ellipse 75% 50% at 92% 88%, rgba(20,60,95,0.22), transparent 60%),
+      linear-gradient(160deg, #0e2130 0%, #122536 45%, #0a1822 78%, #081119 100%);
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  /* diagonal watch-motif stripes, subtle */
+  .stripes{
+    position:absolute; inset:0; opacity:0.05;
+    background: repeating-linear-gradient(45deg, var(--brass) 0 2px, transparent 2px 46px);
+    pointer-events:none;
+  }
+
+  .frame{
+    position:absolute; inset:26px; border:1.5px solid rgba(201,162,39,0.35); pointer-events:none;
+  }
+  .corner{ position:absolute; width:20px; height:20px; border-top:2px solid var(--brass-light); border-left:2px solid var(--brass-light); }
+  .corner.tl{ top:-1.5px; left:-1.5px; }
+  .corner.tr{ top:-1.5px; right:-1.5px; transform:rotate(90deg); }
+  .corner.br{ bottom:-1.5px; right:-1.5px; transform:rotate(180deg); }
+  .corner.bl{ bottom:-1.5px; left:-1.5px; transform:rotate(270deg); }
+
+  /* Urgency stamp - rotated ribbon corner */
+  .stamp{
+    position:absolute; top:88px; right:-118px;
+    width:420px; padding:14px 0; text-align:center;
+    background:linear-gradient(135deg, var(--red-light), var(--red));
+    color:#fff; font-family:'Jost',sans-serif; font-weight:700; font-size:26px; letter-spacing:0.1em;
+    white-space:nowrap;
+    transform:rotate(45deg);
+    box-shadow:0 6px 18px rgba(0,0,0,0.35);
+    border-top:1px solid rgba(255,255,255,0.4);
+    border-bottom:1px solid rgba(0,0,0,0.25);
+  }
+
+  .content{
+    position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; text-align:center;
+    padding:0 90px;
+  }
+
+  .mark{
+    font-family:'Cinzel', serif; font-weight:600; letter-spacing:0.36em; font-size:24px;
+    color:var(--bone-dim); margin-bottom:34px;
+  }
+  .mark b{ color:var(--brass-light); }
+
+  .eyebrow{
+    font-family:'Jost', sans-serif; font-weight:500; letter-spacing:0.3em; text-transform:uppercase;
+    font-size:20px; color:var(--brass); margin-bottom:14px;
+  }
+
+  .discount-row{
+    display:flex; align-items:baseline; gap:14px; margin-bottom:6px;
+  }
+  .discount-num{
+    font-family:'Cinzel', serif; font-weight:800; font-size:220px; line-height:0.85;
+    background: linear-gradient(180deg, var(--brass-light) 10%, var(--brass) 55%, #8a6a1c 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 8px 24px rgba(201,162,39,0.3));
+  }
+  .discount-percent{
+    font-family:'Cinzel', serif; font-weight:700; font-size:90px;
+    color:var(--brass-light);
+  }
+
+  .discount-label{
+    font-family:'Cinzel', serif; font-weight:700; font-size:46px; letter-spacing:0.06em;
+    color:var(--bone); margin-bottom:38px;
+  }
+
+  .sub{
+    font-family:'Cormorant Garamond', serif; font-style:italic; font-weight:600; font-size:32px;
+    color:var(--bone-dim); max-width:680px; line-height:1.35; margin-bottom:44px;
+  }
+
+  .date-pill{
+    display:flex; align-items:center; gap:16px;
+    border:1.5px solid var(--brass); border-radius:100px;
+    padding:16px 40px; margin-bottom:20px;
+    background:rgba(201,162,39,0.08);
+  }
+  .date-pill svg{ flex-shrink:0; }
+  .date-text{
+    font-family:'Jost', sans-serif; font-weight:600; font-size:30px; letter-spacing:0.03em; color:var(--bone);
+  }
+  .date-text b{ color:var(--brass-light); }
+
+  .cta-word{
+    font-family:'Cinzel', serif; font-weight:800; font-size:56px; letter-spacing:0.14em;
+    color:var(--red-light);
+    text-shadow:0 0 30px rgba(226,72,59,0.45);
+    margin-top:18px;
+  }
+
+  .footer-line{
+    position:absolute; bottom:56px; left:0; right:0; text-align:center;
+    font-family:'Jost', sans-serif; font-weight:400; font-size:20px; letter-spacing:0.24em;
+    color:var(--brass-dim); text-transform:uppercase;
+  }
+</style>
+</head>
+<body>
+  <div class="banner">
+    <div class="stripes"></div>
+    <div class="frame">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner br"></div><div class="corner bl"></div>
+    </div>
+    <div class="stamp">SHOSHILING</div>
+
+    <div class="content">
+      <div class="mark">SOAT <b>|</b> SPACE</div>
+
+      <div class="eyebrow">Maxsus aksiya</div>
+      <div class="discount-row">
+        <div class="discount-num">10</div>
+        <div class="discount-percent">%</div>
+      </div>
+      <div class="discount-label">CHEGIRMA</div>
+
+      <div class="sub">Barcha turdagi soatlarni xarid qilsangiz</div>
+
+      <div class="date-pill">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="5" width="18" height="16" rx="2" stroke="#f0d878" stroke-width="1.6"/>
+          <path d="M3 9H21" stroke="#f0d878" stroke-width="1.6"/>
+          <path d="M8 3V6M16 3V6" stroke="#f0d878" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <div class="date-text"><b>03.08.2026</b> — <b>10.08.2026</b></div>
+      </div>
+    </div>
+
+    <div class="footer-line">@soat_space</div>
+  </div>
+</body>
+</html>
